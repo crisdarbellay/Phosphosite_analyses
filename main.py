@@ -78,29 +78,29 @@ def calculate_stability(pdb_path, location_list):
         stability_score = 0
 
         # Calculate distance cutoff for helix and beta sheet
-        alpha_helix_distance = 100000.0
-        beta_fold_distance = 1000.0
+        alpha_helix_distance = 10.0
+        beta_fold_distance = 10.0
 
         # Get residue from model
         residues = model.get_residues()
         for residu1 in residues:
             if residu1.get_id()[1] == residue_number:
-                for residu2 in residues:
+                for residu2 in model.get_residues():
                     distance = calculate_distance(residu1['CA'].get_coord(), residu2['CA'].get_coord())
                     if distance <= alpha_helix_distance:
                         res_dssp = ''
                         with open(temp_dssp_file_path, 'r') as dssp_file:
                             for dssp_line in dssp_file:
-                                if dssp_line.startswith(f"  {residu2.get_id()[1]} "):
+                                if dssp_line[5:10].strip() == str(residu2.get_id()[1]):
                                     res_dssp = dssp_line.split()[4]
                                     break
                         if res_dssp == 'H':
                             helix_count += 1
-                    elif distance <= beta_fold_distance:
+                    if distance <= beta_fold_distance:
                         res_dssp = ''
                         with open(temp_dssp_file_path, 'r') as dssp_file:
                             for dssp_line in dssp_file:
-                                if dssp_line.startswith(f"  {residu2.get_id()[1]} "):
+                                if dssp_line[5:10].strip() == str(residu2.get_id()[1]):
                                     res_dssp = dssp_line.split()[4]
                                     break
                         if res_dssp == 'E':
@@ -124,7 +124,7 @@ def calculate_stability(pdb_path, location_list):
 # Example usage
 pdb_path = r"/mnt/c/Users/crisd/Desktop/Projet/NTH3.pdb"
 
-location_list = [27, 90, 150, 300]  # Add more residue positions as needed
+location_list = [27, 90,134, 150, 300,190,246]  # Add more residue positions as needed
 
 result = calculate_stability(pdb_path, location_list)
 
