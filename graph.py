@@ -1,179 +1,270 @@
-import os
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
 
-def create_heatmap(x, y, z, title, output_path):
-    plt.figure(figsize=(10, 6))
-    cmap = cm.get_cmap('coolwarm')
-    plt.imshow(z, cmap=cmap, extent=[x.min(), x.max(), y.min(), y.max()], origin='lower', aspect='auto')
-    
-    plt.colorbar(label='Frequency (%)')
-    plt.xlabel('Score')
-    plt.ylabel('Alphafold confidence score')
-    plt.title(title)
-    
-    plt.savefig(output_path)
-    plt.close()
+def parse_data(input_file):
+    with open(input_file, 'r') as fichier:
+        lignes = fichier.readlines()
 
-def get_top_n_residues(group_data, n, sort_key_index, top=False):
-    # Triez la liste group_data en fonction du critère de classement (sort_key_index)
-    if top:
-        sorted_data = sorted(group_data, key=lambda data: data[sort_key_index], reverse=True)[::-1]
-    else:    
-        sorted_data = sorted(group_data, key=lambda data: data[sort_key_index], reverse=True)
-    
-    # Sélectionnez les N premiers éléments (top N) de la liste triée
-    top_n_residues = sorted_data[:n]
-    
-    return top_n_residues
+        en_tete = lignes[0].strip().split('\t')
 
-def create_surface_plot(x, y, z, title, output_path):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    
-    surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-    
-    ax.set_xlabel('Score')
-    ax.set_ylabel('Alphafold confidence score')
-    ax.set_zlabel('Frequency (%)')
-    ax.set_title(title)
-    
-    fig.colorbar(surf, shrink=0.5, aspect=10)
-    
-    plt.savefig(output_path)
-    plt.close()
+        # Initialiser un dictionnaire de données
+        tableau = {}
 
-def write_ranking_data(output_file, title, data_list):
-    output_file.write(f"{title}:\n\tGene\tsite\tScore\tAlphafold confidence\tNextAA in sec struct\n")
-    for i, data in enumerate(data_list, start=1):
-        confidence, score, next_aa, gene, site = data
-        output_file.write(f"{i}.\t{gene}\t{site}\t{score:.2f}\t\t{confidence:.2f}\t\t{next_aa:.0f}\n")
-    output_file.write("\n")
+        # Parcourir les lignes à partir de la deuxième ligne
+        for ligne in lignes[1:]:
+            # Séparer chaque ligne en colonnes en utilisant le séparateur '\t'
+            colonnes = ligne.strip().split('\t')
+            
+            # Extraire les informations clés
+            gene = colonnes[0]
+            site = int(colonnes[1])
+            
+            # Créer un dictionnaire de site s'il n'existe pas déjà
+            if gene not in tableau:
+                tableau[gene] = {}
+            if site not in tableau[gene]:
+                tableau[gene][site] = {}
 
-def write_slice_info(output_file, confidence_min, confidence_max, total_sites, filtered_data):
-    output_file.write(f"Slice of confidence score: {confidence_min}-{confidence_max}\n")
-    output_file.write(f"Number of phosphorylated site: {len(filtered_data)}\n")
-    output_file.write(f"Frequency: {len(filtered_data) / total_sites * 100:.2f}%\n")
-    output_file.write(f"Average score: {np.mean([data[1] for data in filtered_data]):.2f}\n")
-    output_file.write(f"Average nextAA in sec struct: {np.mean([data[2] for data in filtered_data]):.2f}\n\n")
+            # Ajouter les données de chaque colonne au dictionnaire
+            for i in range(2, len(colonnes)):
+                colonne = en_tete[i]
+                valeur = colonnes[i]
+                tableau[gene][site][colonne] = valeur
 
-def generate_3d_surface_graphs(input_file, output_folder):
-    # Créer un dossier de destination s'il n'existe pas
-    os.makedirs(output_folder, exist_ok=True)
+        return tableau
+
+
+def calculate_ranking(data, column_name, top_n=10, ascending=False):
+    """
+    Calculate ranking based on a specified column in the data dictionary.
+    """
+
+    # Create a list of tuples containing (gene, site, values) for the specified column
+    ranking_data = []
+    for gene, site_dict in data.items():
+        for site, values in site_dict.items():
+            if column_name in values:
+                ranking_data.append((gene, site, values[column_name], values))
+
+    # Sort the ranking data based on the specified column
+    ranking_data.sort(key=lambda x: float(x[2]), reverse=not ascending)
+
+    # Create a DataFrame for the ranking
+    ranking_df = pd.DataFrame(ranking_data, columns=['Gene', 'Site', 'Confidence', 'Values'])
+    ranking_df['Rank'] = range(1, 1 + len(ranking_df))
+
+    return ranking_df.head(top_n)
+
+
+def create_groups(data, input_file):
+    with open(input_file, 'r') as fichier:
+        first_line = fichier.readline()
+        txt_columns = [col.strip() for col in first_line.split('\t') if col.endswith('.txt') or col.endswith('.txt\n')]
     
-    # Lire le fichier ligne par ligne et traiter les données
-    with open(input_file, 'r') as file:
-        # Ignorer la première ligne (en-tête)
-        next(file)
+    groups = {
+        'All Sites': [(gene, site) for gene, site_data in data.items() for site in site_data],
+        'Not in any .txt': []
+    }
+    
+    for gene, site_data in data.items():
+        for site, values in site_data.items():
+            found_in_txt = False
+            for col in txt_columns:
+                if values[col] == 'X':
+                    found_in_txt = True
+                    groups[col] = groups.get(col, [])
+                    groups[col].append((gene, site))
+                    break
+            if not found_in_txt:
+                groups['Not in any .txt'].append((gene, site))
         
-        # Initialiser des dictionnaires pour chaque groupe
-        groups = {
-            'albuquerque_data': [],
-            'soulard_data': [],
-            'swaney_data': [],
-            'in_no_data': [],
-            'in_all_data': [],
-            'all_residue': []  # Ajout du groupe "all_residue"
+    return groups
+
+
+def calculate_group_stats(group_sites, data):
+    confidence_total = 0
+    score_total = 0
+    count = len(group_sites)
+    
+    for site_info in group_sites:
+        gene = site_info[0]
+        site=site_info[1]
+        site_data = data.get(gene, {}).get(site, {})
+        confidence = float(site_data.get('Confidence', 0))
+        score = float(site_data.get('Score', 0))
+        confidence_total += confidence
+        score_total += score
+    
+    if count == 0:
+        return {
+            'count': 0,
+            'confidence_avg': 0.00,
+            'score_avg': 0.00
         }
-        
-        for line in file:
-            parts = line.split('\t')
-            gene = parts[0]
-            site = parts[1]
-            score = float(parts[2])
-            if parts[5] != '':
-                confidence = float(parts[5])
-                next_aa = float(parts[7])
-            alb_txt = parts[8]
-            sou_txt = parts[9]
-            swa_txt = parts[10]
-            
-            # Ajouter les données au groupe approprié en fonction des colonnes Alb.txt, Sou.txt et Swa.txt
-            if alb_txt == 'X':
-                groups['albuquerque_data'].append((confidence, score, next_aa,gene,site))
-            if sou_txt == 'X':
-                groups['soulard_data'].append((confidence, score, next_aa,gene,site))
-            if swa_txt == 'X':
-                groups['swaney_data'].append((confidence, score, next_aa,gene,site))
-            if alb_txt != 'X' and sou_txt != 'X' and swa_txt == 'X':
-                groups['in_no_data'].append((confidence, score, next_aa,gene,site))
-            if alb_txt == 'X' and sou_txt == 'X' and swa_txt == 'X':
-                groups['in_all_data'].append((confidence, score, next_aa,gene,site))
-            
-            # Ajouter les données au groupe "all_residue"
-            groups['all_residue'].append((confidence, score, next_aa,gene,site))
     
-    # Générer les graphiques en forme de surface pour chaque groupe
-    for group_name, group_data in groups.items():
-        if not group_data:
-            continue
-        
-        # Créer les tranches de score de confiance
-        confidence_bins = np.arange(0, 101, 2)
-        score_bins = np.arange(0, 23, 1)  # Crée des tranches de 2 en 2 jusqu'à 22
-        confidence_bins10 = np.arange(0, 101, 10)
-
-        # Compter le nombre d'occurrences dans chaque tranche
-        freq_matrix = np.zeros((len(confidence_bins) - 1, len(score_bins) - 1))
-        
-        for data in group_data:
-            confidence = data[0]
-            score = data[1]
-            
-            confidence_bin = np.digitize(confidence, confidence_bins) - 1
-            score_bin = np.digitize(score, score_bins) - 1
-            
-            if confidence_bin < 0 or confidence_bin >= len(confidence_bins) - 1 or score_bin < 0 or score_bin >= len(score_bins) - 1:
-                continue
-            
-            freq_matrix[confidence_bin, score_bin] += 1
-        
-        # Convertir les occurrences en fréquences en pourcentage
-        total_sites = len(group_data)
-        freq_matrix = freq_matrix / total_sites * 100
-        
-        create_heatmap(
-            *np.meshgrid(score_bins[:-1], confidence_bins[:-1]),
-            freq_matrix,
-            f'{group_name.capitalize()} - Frequency in function of Alphafold confidence and number of AA in a ball within 10 angstrom',
-            os.path.join(output_folder, f'{group_name}_heatmap.png')
-        )
-        
-    # Écrire les informations dans le fichier de sortie
-    output_filename = os.path.join(output_folder, f'{group_name}_info.txt')
-    with open(output_filename, 'w') as output_file:
-        ecrire_infos_sortie(output_file, groups, confidence_bins10, total_sites)
-    print(f"Informations écrites")
-
-def ecrire_infos_sortie(output_file, groupes, tranches_confiance, total_sites):
-    for nom_groupe, donnees_groupe in groupes.items():
-        if not donnees_groupe:
-            continue
-
-        output_file.write(f"Groupe {nom_groupe}\n")
-        output_file.write(f"Nombre de résidus : {len(donnees_groupe)}\t")
-        output_file.write(f"Moyenne de confiance Alphafold : {np.mean([data[0] for data in donnees_groupe]):.2f}\n")
-        output_file.write(f"Moyenne de score : {np.mean([data[1] for data in donnees_groupe]):.2f}\n\n")
-        
-    top_10_score_residues = get_top_n_residues(groupes['all_residue'], 10, sort_key_index=1)
-    top_10_confidence_residues = get_top_n_residues(groupes['all_residue'], 10, sort_key_index=0)
-    top_10_nextaa_residues = get_top_n_residues(groupes['all_residue'],10,sort_key_index=2,top=True)
-
-    write_ranking_data(output_file, "Ranking score", top_10_score_residues)
-    write_ranking_data(output_file, "Ranking Alphafold confidence", top_10_confidence_residues)
-    write_ranking_data(output_file, "Ranking NextAA in sec struct", top_10_nextaa_residues)
+    confidence_avg = confidence_total / count
+    score_avg = score_total / count
     
-    for confidence_bin in range(len(tranches_confiance) - 1):
-        confidence_min = tranches_confiance[confidence_bin]
-        confidence_max = tranches_confiance[confidence_bin + 1]
-        
-        filtered_data = [data for data in groupes['all_residue'] if confidence_min <= data[0] <= confidence_max]
-        if filtered_data:
-            write_slice_info(output_file, confidence_min, confidence_max, total_sites, filtered_data)
+    return {
+        'count': count,
+        'confidence_avg': confidence_avg,
+        'score_avg': score_avg
+    }
 
-# Appeler la fonction pour générer les graphiques en forme de surface
-input_file = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results.txt"  # Remplacez par le chemin de votre fichier d'entrée
-output_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/Cdk1/Graph"
-generate_3d_surface_graphs(input_file, output_folder)
+
+def calculate_stats(data):
+    stats = {}
+    groups = data['Gene'].unique()
+
+    for group in groups:
+        group_data = data[data['Gene'] == group]
+        count = len(group_data)
+        confidence_avg = group_data['Confidence'].mean()
+        score_avg = group_data['Score'].mean()
+        
+        stats[group] = {
+            'count': count,
+            'confidence_avg': confidence_avg,
+            'score_avg': score_avg
+        }
+    
+    return stats
+
+def calculate_slices_stats(data, confidence_range):
+    total_sites = 0
+    phosphorylated_sites = 0
+    total_score = 0
+    total_nextAA = 0
+    
+    for gene_data in data.values():
+        for site_data in gene_data.values():
+            total_sites += 1  # Increment total_sites for each site
+            
+            confidence = float(site_data.get('Confidence', 0))
+            if confidence_range[0] <= confidence < confidence_range[1]:
+                phosphorylated_sites += 1
+                total_score += float(site_data.get('Score', 0))
+                total_nextAA += float(site_data.get('NextAA', 0))
+    
+    if total_sites == 0:
+        return {
+            'Number of phosphorylated site': 0,
+            'Frequency': '0.00%',
+            'Average score': 0.00,
+            'Average nextAA in sec struct': 0.00
+        }
+    
+    frequency = (phosphorylated_sites / total_sites) * 100
+    if not phosphorylated_sites==0:
+        avg_score = total_score / phosphorylated_sites
+        avg_nextAA = total_nextAA / phosphorylated_sites
+    else:
+        avg_nextAA=None
+        avg_score=None
+    
+    return {
+        'Number of phosphorylated site': phosphorylated_sites,
+        'Frequency': f'{frequency:.2f}%',
+        'Average score': avg_score,
+        'Average nextAA in sec struct': avg_nextAA
+    }
+
+def calculate_all_slices_stats(data):
+    confidence_ranges = [(20, 30), (30, 40), (40, 50), (50, 60), (60, 70), (80, 90)]
+    slices_stats = {}
+    
+    for confidence_range in confidence_ranges:
+        slice_name = f'Slice of confidence score: {confidence_range[0]}-{confidence_range[1]}'
+        slices_stats[slice_name] = calculate_slices_stats(data, confidence_range)
+    
+    return slices_stats
+
+def create_heatmap(data, group_sites, group_name, characteristic, output_folder):
+    plt.figure(figsize=(10, 6))
+    
+    max_confidence = 100  # La plage des valeurs de confiance est fixe de 0 à 100
+    max_value = 0  # Initialiser à 0
+
+    for gene, site in group_sites:
+        site_data = data.get(gene, {}).get(site, {})
+        confidence = float(site_data.get('Confidence', 0))
+        value = float(site_data.get(characteristic, 0))
+
+        max_value = max(max_value, value)  # Mettre à jour la valeur maximale
+
+    heatmap_data = np.zeros((101, int(max_value) + 1))
+
+    for gene, site in group_sites:
+        site_data = data.get(gene, {}).get(site, {})
+        confidence = float(site_data.get('Confidence', 0))
+        value = float(site_data.get(characteristic, 0))
+
+        heatmap_data[int(confidence)][int(value)] += 1
+
+    heatmap_data_transposed = np.transpose(heatmap_data)  # Transposer la matrice
+
+    plt.imshow(heatmap_data_transposed, cmap='coolwarm', origin='lower', extent=[0, max_confidence, 0, max_value], aspect='auto', interpolation='bilinear')
+    plt.colorbar(label='Frequency')
+    plt.xlabel('Alphafold Confidence')
+    plt.ylabel(characteristic)
+    plt.title(f'Heatmap of {characteristic} vs. Alphafold Confidence - Group: {group_name}')
+    plt.savefig(f'{output_folder}/{group_name}_{characteristic}_heatmap.png')
+    plt.show()
+
+
+
+
+def print_outside_file(output_file_path,input_file,to_rank,secondary_structures):
+
+    data = parse_data(input_file)
+    groups = create_groups(data, input_file)
+    datas=calculate_group_stats(groups, data)
+    slices=calculate_all_slices_stats(data)
+
+    with open(input_file) as fichier:
+        first_line = fichier.readline()
+        txt_columns = [col.strip() for col in first_line.split('\t') if col.endswith('.txt') or col.endswith('.txt\n')]
+
+    with open(output_file_path, 'w') as output_file:
+
+        for group_name, group_sites in groups.items():
+            group_stats = calculate_group_stats(group_sites, data)
+            output_file.write(f"Group {group_name}\n")
+            output_file.write(f"Number of sites : {group_stats['count']}\nAverage alphafold confidence : {group_stats['confidence_avg']:.2f}\n")
+            output_file.write(f"Average score : {group_stats['score_avg']:.2f}\n\n")
+            for characteristic in ['Score','NextAA']:
+                create_heatmap(data, group_sites, group_name, characteristic, output_folder)
+
+        for rank in to_rank:
+            ranking = calculate_ranking(data, rank[0], rank[1], rank[2])
+            output_file.write(f"Ranking {rank[0]}:\n")
+            output_file.write("\tGene\tsite\tScore\tAF_Conf\tNextAA\t")
+            for secondary_structure in secondary_structures:
+                output_file.write(f"{secondary_structure[2]}\t")
+            output_file.write("\n")
+            for index, row in ranking.iterrows():
+                output_file.write(f"{index + 1}.\t{row['Gene']}\t{row['Site']}\t{row['Values']['Score']}\t{row['Values']['Confidence']}\t{row['Values']['NextAA']}\t")
+                for secondary_structure in secondary_structures:
+                    output_file.write(f"{row['Values'].get(secondary_structure[2], '')}\t")
+                output_file.write("\n")
+            output_file.write("\n")
+
+        for slice_name, slice_data in slices.items():
+            output_file.write(f"{slice_name}:\n")
+            for key, value in slice_data.items():
+                output_file.write(f"{key}: {value}\n")
+            output_file.write("\n")
+
+input_file = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/PKA/results.txt" 
+output_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/PKA/results"
+
+alpha_H_distance=10
+beta_E_distance=10
+count=0
+secondary_structures=[('H',alpha_H_distance,'alpha',count),('E',beta_E_distance,'beta',count),('B',beta_E_distance,'iso_B',count),('G',alpha_H_distance,'alpha3',count),('I',alpha_H_distance,'alphaI',count),('T',alpha_H_distance,'hydrogene_turn',count)]
+to_rank=[('Score',10,False),('Confidence',10,False),('NextAA',10,True),('alpha',10,False),('beta',10,False),('iso_B',10,False),('alpha3',10,False),('alphaI',10,False)]
+                
+output_file_path = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/PKA/results/output_file.txt"  # Replace with the desired output file path
+
+#print_outside_file(output_file_path,input_file,to_rank,secondary_structures)

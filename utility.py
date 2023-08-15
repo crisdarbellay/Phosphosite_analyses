@@ -73,7 +73,7 @@ def calculate_confidence_scores(atom_line, residue_key):
     return confidence_scores
 
 
-def calculate_stability_cif(cif_file_path, site):
+def calculate_stability_cif(cif_file_path, site,secondary_structures):
     """
     Calculate the stability scores for residues at specific locations in a CIF file.
     """
@@ -122,22 +122,22 @@ def calculate_stability_cif(cif_file_path, site):
     chain_distance_temp = 10000
     confidence_scores_sum = 0
     confidence_scores_count = 0
-    alpha_helix_distance = 10.0
-    beta_fold_distance = 10.0
-
+    count_dict = {count[2]: 0 for count in secondary_structures}
     residues = model.get_residues()
+
     for residu1 in residues:
         if residu1.get_id()[1] == site:
             for residu2 in model.get_residues():
                 distance = calculate_distance(residu1['CA'].get_coord(), residu2['CA'].get_coord())
                 res_dssp = dssp_info.get(residu2.get_id()[1], '')
 
-                if distance <= alpha_helix_distance:                        
-                    if res_dssp == 'H':
-                        helix_count += 1
-                if distance <= beta_fold_distance:
-                    if res_dssp == 'E':
-                        beta_count += 1
+                for count in secondary_structures:
+                    if count[0]==res_dssp:
+                        chain_distance_temp = abs(residu1.get_id()[1] - residu2.get_id()[1])
+                        if chain_distance_temp < chain_distance:
+                            chain_distance = chain_distance_temp
+                    if distance<=count[1] and res_dssp==count[0]:                        
+                        count_dict[count[2]] += 1
                 if distance <= 10.0:
                     try:
                         confidence_score = calculate_confidence_scores(begin_by_ATOM(temp_cif_file_path), residu2.get_id())[residu2.get_id()]
@@ -146,23 +146,17 @@ def calculate_stability_cif(cif_file_path, site):
                     if confidence_score is not None:
                         confidence_scores_sum += confidence_score
                         confidence_scores_count += 1                           
-                if res_dssp == 'E' or res_dssp == 'H':
-                    chain_distance_temp = abs(residu1.get_id()[1] - residu2.get_id()[1])
-                    if chain_distance_temp < chain_distance:
-                        chain_distance = chain_distance_temp
-
-    stability_score = helix_count + beta_count
+    stability_score = sum(count_dict.values())
     average_confidence_score = round(confidence_scores_sum / confidence_scores_count, 1) if confidence_scores_count > 0 else None
+    temp_dict = {count[2]: count[3] for count in secondary_structures}
 
     stability_scores.append({
             'residue_number': site,
             'stability_score': stability_score,
-            'helix_count': helix_count,
-            'beta_count': beta_count,
             'average_confidence_score': average_confidence_score,
-            'chain_dist_secondary_struct': chain_distance
+            'chain_dist_secondary_struct': chain_distance,
+            **count_dict
         })
-
     # Remove temporary DSSP file
     os.remove(temp_dssp_file_path)
 
@@ -194,10 +188,12 @@ def check_phosphorylation_context(sequence, target_position, context):
     
     """
     
-    start_position = target_position - 3
-    end_position = target_position + 2
-    
-    target_sequence = sequence[start_position:end_position]
+    #start_position = target_position - 3
+    #end_position = target_position + 2
+    if target_position<len(sequence):
+        target_sequence = sequence[target_position]
+    else:
+        target_sequence='+'
     
     return target_sequence == context
 
@@ -206,20 +202,26 @@ def create_gene_dict(site_list_file):
     gene_dict = {}
     with open(site_list_file, 'r') as file:
         for line in file:
-            parts = line.strip().split()
-            gene_name = parts[1]
-            site_position = int(parts[2])
-            phosphorylation_context_gross = parts[3]
-            position_hashtag=phosphorylation_context_gross.index('#')
-            phosphorylation_context_pre=phosphorylation_context_gross[position_hashtag-3:position_hashtag+3]
-            phosphorylation_context=phosphorylation_context_pre.replace('#','')
+            if 'Yes' in line:
+                parts = line.strip().split()
+                gene_name = parts[0]  # Remove "_YEAST" from the gene name
+                site_list = parts[-1].split(';')  # Extract the sites from the last column
+                site_positions = []
+            # Extract site positions and handle any potential errors
+                for site in site_list:
+                    try:
+                        site_position = int(site[1:])
+                        context=site[0]
+                        site_positions.append(site_position)
+                    except ValueError:
+                        print(f"Warning: Invalid site position '{site}' for gene '{gene_name}'.")
             
-            if gene_name not in gene_dict:
-                gene_dict[gene_name] = []
-            gene_dict[gene_name].append((site_position, phosphorylation_context))
+                    if gene_name not in gene_dict:
+                        gene_dict[gene_name] = []
+                    gene_dict[gene_name].append((site_position, context))
     return gene_dict
 
-def process_gene_site(site_list_file, cif_directory, output_file,database_folder):
+def process_gene_site(site_list_file, cif_directory, output_file,database_folder,secondary_structures):
     """
     Process the gene sites from the site list file, find corresponding CIF and PDB files,
     and calculate stability for each site. Write the results to the output file in a tab-separated format.
@@ -237,7 +239,7 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
             with gzip.open(cif_file_path, 'rt') as cif_file:
                 key_residue=None
                 for line in cif_file:
-                    if "_ma_target_ref_db_details.gene_name" in line:
+                    if "_ma_target_ref_db_details.db_code" in line:
                         for key in gene_dict.keys():
                             if key in line:
                                 key_residue=key
@@ -247,7 +249,7 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
                     protein_sequence=extract_protein_sequence_from_cif(cif_file)
                     for site in gene_dict[key_residue]:
                         if check_phosphorylation_context(protein_sequence, site[0], site[1]):
-                            stability_scores = calculate_stability_cif(cif_file_path, site[0])
+                            stability_scores = calculate_stability_cif(cif_file_path, site[0],secondary_structures)
                             results.append({
                                 'gene_name': key_residue,
                                 'stability_scores': stability_scores,
@@ -258,29 +260,34 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
     sorted_results = sorted(results, key=lambda x: x['gene_name'])
 
 # Write sorted results to the output file
-    with open(output_file, 'w') as out_file:    
-        out_file.write("Gene\tRes\tScore\tHelix\tBeta\tConfidence\tNextAA")
+    with open(output_file, 'w') as out_file:
+        count_text=''
+        for secondary_structure in secondary_structures:
+            count_text=count_text+secondary_structure[2]+'\t'
+        out_file.write(f"Gene\tRes\tScore\t{count_text}Confidence\tNextAA")
+         
         for database in base_databases:
-         out_file.write(f"\t{database}")
+            out_file.write(f"\t{database}")
         out_file.write("\n")
     
         for result in sorted_results:
             gene_name = result['gene_name']
             stability_scores = result['stability_scores']
             phosphorylation_info = result['phosphorylation_info']
-        
+
             for stats in stability_scores:
                 residue_number = stats['residue_number']
                 stability_score = stats['stability_score']
-                helix_count = stats['helix_count']
-                beta_count = stats['beta_count']
-                confidence_score = stats['average_confidence_score']
+                average_confidence_score = stats['average_confidence_score']
                 chain_distance = stats['chain_dist_secondary_struct']
-            
-            # Write gene name and site information
-                out_file.write(f"{gene_name}\t{residue_number}\t{stability_score}\t{helix_count}\t{beta_count}\t{confidence_score}\t\t{chain_distance}\t")
-            
-            # Write 'X' or '' for each database based on phosphorylation_info
+                counts = '' 
+                for count in secondary_structures:
+                    counts += str(stats[count[2]]) + '\t'
+        # Write gene name and site information
+                       
+                out_file.write(f"{gene_name}\t{residue_number}\t{stability_score}\t{counts}{average_confidence_score}\t{chain_distance}\t")
+               
+        # Write 'X' or '' for each database based on phosphorylation_info
                 for database in base_databases:
                     site_info_list = phosphorylation_info.get(gene_name, [])
                     if any((database, True) in site_info for site_info in site_info_list):
@@ -289,3 +296,5 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
                         out_file.write("-\t")
 
                 out_file.write("\n")
+
+
