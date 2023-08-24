@@ -10,6 +10,29 @@ from Bio.PDB import MMCIFParser
 import io
 import matplotlib.pyplot as plt
 
+three_to_one_letter = {
+    'ALA': 'A',
+    'ARG': 'R',
+    'ASN': 'N',
+    'ASP': 'D',
+    'CYS': 'C',
+    'GLN': 'Q',
+    'GLU': 'E',
+    'GLY': 'G',
+    'HIS': 'H',
+    'ILE': 'I',
+    'LEU': 'L',
+    'LYS': 'K',
+    'MET': 'M',
+    'PHE': 'F',
+    'PRO': 'P',
+    'SER': 'S',
+    'THR': 'T',
+    'TRP': 'W',
+    'TYR': 'Y',
+    'VAL': 'V'
+}
+
 
 def begin_by_ATOM(pdb_path):
     """
@@ -38,8 +61,6 @@ def extract_confidence_score(line):
     confidence_score = float(line.split()[14])
     return confidence_score
 
-
-
 def search_phosphorylation_info(gene_dict, database_folder):
     base_databases = os.listdir(database_folder)
     for database_file in base_databases:
@@ -55,10 +76,6 @@ def search_phosphorylation_info(gene_dict, database_folder):
                                 break
     return gene_dict
 
-
-
-
-
 def calculate_confidence_scores(atom_line, residue_key):
     """
     Calculate the confidence scores for a specific residue.
@@ -72,8 +89,7 @@ def calculate_confidence_scores(atom_line, residue_key):
             break
     return confidence_scores
 
-
-def calculate_stability_cif(cif_file_path, site,secondary_structures):
+def calculate_stability_cif(cif_file_path, sites_data,secondary_structures):
     """
     Calculate the stability scores for residues at specific locations in a CIF file.
     """
@@ -89,6 +105,7 @@ def calculate_stability_cif(cif_file_path, site,secondary_structures):
     parser = MMCIFParser(QUIET=True)
     structure = parser.get_structure("protein", cif_file_path)
     model = structure[0]  # Assuming there is only one model in the structure
+    results=[]
 
     stability_scores = []
 
@@ -114,55 +131,63 @@ def calculate_stability_cif(cif_file_path, site,secondary_structures):
                 residue_number = int(line[1])
                 res_dssp = line[4]
                 dssp_info[residue_number] = res_dssp              
+    for site_data in sites_data:
+        helix_count = 0
+        beta_count = 0
+        stability_score = 0
+        chain_distance = 100000
+        chain_distance_temp = 10000
+        confidence_scores_sum = 0
+        confidence_scores_count = 0
+        count_dict = {count[2]: 0 for count in secondary_structures}
+        residues = model.get_residues()
+        if site_data['sub_site'] in [entry['residue_number'] for entry in stability_scores]:
+            continue
+        for residu1 in residues:
+            resname1 = three_to_one_letter.get(residu1.get_resname(), '')
+            if residu1.get_id()[1] == int(site_data['sub_site']) and resname1==site_data['sub_letter']:
+                for residu2 in model.get_residues():
+                    distance = calculate_distance(residu1['CA'].get_coord(), residu2['CA'].get_coord())
+                    res_dssp = dssp_info.get(residu2.get_id()[1], '')
 
-    helix_count = 0
-    beta_count = 0
-    stability_score = 0
-    chain_distance = 100000
-    chain_distance_temp = 10000
-    confidence_scores_sum = 0
-    confidence_scores_count = 0
-    count_dict = {count[2]: 0 for count in secondary_structures}
-    residues = model.get_residues()
+                    for count in secondary_structures:
+                        if count[0]==res_dssp:
+                            chain_distance_temp = abs(residu1.get_id()[1] - residu2.get_id()[1])
+                            if chain_distance_temp < chain_distance:
+                                chain_distance = chain_distance_temp
+                        if distance<=count[1] and res_dssp==count[0]:                        
+                            count_dict[count[2]] += 1
+                    if distance <= 10.0:
+                        try:
+                            confidence_score = calculate_confidence_scores(begin_by_ATOM(temp_cif_file_path), residu2.get_id())[residu2.get_id()]
+                        except: 
+                            confidence_score = None
+                        if confidence_score is not None:
+                            confidence_scores_sum += confidence_score
+                            confidence_scores_count += 1                           
+        stability_score = sum(count_dict.values())
+        average_confidence_score = round(confidence_scores_sum / confidence_scores_count, 1) if confidence_scores_count > 0 else None
+        temp_dict = {count[2]: count[3] for count in secondary_structures}
 
-    for residu1 in residues:
-        if residu1.get_id()[1] == site:
-            for residu2 in model.get_residues():
-                distance = calculate_distance(residu1['CA'].get_coord(), residu2['CA'].get_coord())
-                res_dssp = dssp_info.get(residu2.get_id()[1], '')
-
-                for count in secondary_structures:
-                    if count[0]==res_dssp:
-                        chain_distance_temp = abs(residu1.get_id()[1] - residu2.get_id()[1])
-                        if chain_distance_temp < chain_distance:
-                            chain_distance = chain_distance_temp
-                    if distance<=count[1] and res_dssp==count[0]:                        
-                        count_dict[count[2]] += 1
-                if distance <= 10.0:
-                    try:
-                        confidence_score = calculate_confidence_scores(begin_by_ATOM(temp_cif_file_path), residu2.get_id())[residu2.get_id()]
-                    except: 
-                        confidence_score = None
-                    if confidence_score is not None:
-                        confidence_scores_sum += confidence_score
-                        confidence_scores_count += 1                           
-    stability_score = sum(count_dict.values())
-    average_confidence_score = round(confidence_scores_sum / confidence_scores_count, 1) if confidence_scores_count > 0 else None
-    temp_dict = {count[2]: count[3] for count in secondary_structures}
-
-    stability_scores.append({
-            'residue_number': site,
+        stability_scores.append({
+            'residue_number': site_data['sub_site'],
             'stability_score': stability_score,
             'average_confidence_score': average_confidence_score,
             'chain_dist_secondary_struct': chain_distance,
+            'sub_organism':site_data['sub_organism'],
+            'in_vivo':site_data['in_vivo'],
+            'in_vitro':site_data['in_vitro'],
+            'site_aa':site_data['sub_letter'],
             **count_dict
         })
+        results.append({
+        'gene_name': site_data['substrate_gene'],
+        'stability_scores': stability_scores,
+    })
     # Remove temporary DSSP file
     os.remove(temp_dssp_file_path)
 
     return stability_scores
-
-
 
 def extract_protein_sequence_from_cif(cif_file):
     """
@@ -181,7 +206,6 @@ def extract_protein_sequence_from_cif(cif_file):
 
     return protein_sequence
 
-
 def check_phosphorylation_context(sequence, target_position, context):
     """
     Check if the phosphorylation context around the target position in the sequence matches the given context.
@@ -196,7 +220,6 @@ def check_phosphorylation_context(sequence, target_position, context):
         target_sequence='+'
     
     return target_sequence == context
-
 
 def create_gene_dict(site_list_file):
     gene_dict = {}
@@ -255,8 +278,7 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
                                 'stability_scores': stability_scores,
                                 'phosphorylation_info': phosphorylation_info
                             })
-                         
-                            
+                                          
     sorted_results = sorted(results, key=lambda x: x['gene_name'])
 
 # Write sorted results to the output file
