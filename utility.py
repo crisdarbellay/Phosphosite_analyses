@@ -10,6 +10,22 @@ from Bio.PDB import MMCIFParser
 import io
 import matplotlib.pyplot as plt
 
+def create_gene_dict(site_list_file):
+    gene_dict = {}
+    with open(site_list_file, 'r') as file:
+        for line in file:
+            parts = line.strip().split()
+            gene_name = parts[1]
+            site_position = int(parts[2])
+            phosphorylation_context_gross = parts[3]
+            position_hashtag=phosphorylation_context_gross.index('#')
+            phosphorylation_context_pre=phosphorylation_context_gross[position_hashtag-3:position_hashtag+3]
+            phosphorylation_context=phosphorylation_context_pre.replace('#','')
+            
+            if gene_name not in gene_dict:
+                gene_dict[gene_name] = []
+            gene_dict[gene_name].append((site_position, phosphorylation_context))
+    return gene_dict
 
 def begin_by_ATOM(pdb_path):
     """
@@ -188,38 +204,13 @@ def check_phosphorylation_context(sequence, target_position, context):
     
     """
     
-    #start_position = target_position - 3
-    #end_position = target_position + 2
-    if target_position<len(sequence):
-        target_sequence = sequence[target_position]
-    else:
-        target_sequence='+'
+    start_position = target_position - 3
+    end_position = target_position + 2
+    
+    target_sequence = sequence[start_position:end_position]
     
     return target_sequence == context
 
-
-def create_gene_dict(site_list_file):
-    gene_dict = {}
-    with open(site_list_file, 'r') as file:
-        for line in file:
-            if 'Yes' in line:
-                parts = line.strip().split()
-                gene_name = parts[0]  # Remove "_YEAST" from the gene name
-                site_list = parts[-1].split(';')  # Extract the sites from the last column
-                site_positions = []
-            # Extract site positions and handle any potential errors
-                for site in site_list:
-                    try:
-                        site_position = int(site[1:])
-                        context=site[0]
-                        site_positions.append(site_position)
-                    except ValueError:
-                        print(f"Warning: Invalid site position '{site}' for gene '{gene_name}'.")
-            
-                    if gene_name not in gene_dict:
-                        gene_dict[gene_name] = []
-                    gene_dict[gene_name].append((site_position, context))
-    return gene_dict
 
 def process_gene_site(site_list_file, cif_directory, output_file,database_folder,secondary_structures):
     """
@@ -239,7 +230,7 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
             with gzip.open(cif_file_path, 'rt') as cif_file:
                 key_residue=None
                 for line in cif_file:
-                    if "_ma_target_ref_db_details.db_code" in line:
+                    if "_ma_target_ref_db_details.gene_name" in line:
                         for key in gene_dict.keys():
                             if key in line:
                                 key_residue=key

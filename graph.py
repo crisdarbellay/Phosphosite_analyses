@@ -8,25 +8,19 @@ def parse_data(input_file):
 
         en_tete = lignes[0].strip().split('\t')
 
-        # Initialiser un dictionnaire de données
         tableau = {}
 
-        # Parcourir les lignes à partir de la deuxième ligne
         for ligne in lignes[1:]:
-            # Séparer chaque ligne en colonnes en utilisant le séparateur '\t'
             colonnes = ligne.strip().split('\t')
             
-            # Extraire les informations clés
             gene = colonnes[0]
             site = int(colonnes[1])
             
-            # Créer un dictionnaire de site s'il n'existe pas déjà
             if gene not in tableau:
                 tableau[gene] = {}
             if site not in tableau[gene]:
                 tableau[gene][site] = {}
 
-            # Ajouter les données de chaque colonne au dictionnaire
             for i in range(2, len(colonnes)):
                 colonne = en_tete[i]
                 valeur = colonnes[i]
@@ -156,12 +150,8 @@ def calculate_slices_stats(data, confidence_range):
         }
     
     frequency = (phosphorylated_sites / total_sites) * 100
-    if not phosphorylated_sites==0:
-        avg_score = total_score / phosphorylated_sites
-        avg_nextAA = total_nextAA / phosphorylated_sites
-    else:
-        avg_nextAA=None
-        avg_score=None
+    avg_score = total_score / phosphorylated_sites
+    avg_nextAA = total_nextAA / phosphorylated_sites
     
     return {
         'Number of phosphorylated site': phosphorylated_sites,
@@ -183,15 +173,15 @@ def calculate_all_slices_stats(data):
 def create_heatmap(data, group_sites, group_name, characteristic, output_folder):
     plt.figure(figsize=(10, 6))
     
-    max_confidence = 100  # La plage des valeurs de confiance est fixe de 0 à 100
-    max_value = 0  # Initialiser à 0
+    max_confidence = 100  
+    max_value = 0  
 
     for gene, site in group_sites:
         site_data = data.get(gene, {}).get(site, {})
         confidence = float(site_data.get('Confidence', 0))
         value = float(site_data.get(characteristic, 0))
 
-        max_value = max(max_value, value)  # Mettre à jour la valeur maximale
+        max_value = max(max_value, value)  # Update max value
 
     heatmap_data = np.zeros((101, int(max_value) + 1))
 
@@ -202,7 +192,7 @@ def create_heatmap(data, group_sites, group_name, characteristic, output_folder)
 
         heatmap_data[int(confidence)][int(value)] += 1
 
-    heatmap_data_transposed = np.transpose(heatmap_data)  # Transposer la matrice
+    heatmap_data_transposed = np.transpose(heatmap_data)  
 
     plt.imshow(heatmap_data_transposed, cmap='coolwarm', origin='lower', extent=[0, max_confidence, 0, max_value], aspect='auto', interpolation='bilinear')
     plt.colorbar(label='Frequency')
@@ -215,7 +205,7 @@ def create_heatmap(data, group_sites, group_name, characteristic, output_folder)
 
 
 
-def print_outside_file(output_file_path,input_file,to_rank,secondary_structures):
+def print_outside_file(output_file_path,input_file,to_rank,secondary_structures,output_folder):
 
     data = parse_data(input_file)
     groups = create_groups(data, input_file)
@@ -256,15 +246,6 @@ def print_outside_file(output_file_path,input_file,to_rank,secondary_structures)
                 output_file.write(f"{key}: {value}\n")
             output_file.write("\n")
 
-input_file = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/PKA/results.txt" 
-output_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/PKA/results"
 
-alpha_H_distance=10
-beta_E_distance=10
-count=0
-secondary_structures=[('H',alpha_H_distance,'alpha',count),('E',beta_E_distance,'beta',count),('B',beta_E_distance,'iso_B',count),('G',alpha_H_distance,'alpha3',count),('I',alpha_H_distance,'alphaI',count),('T',alpha_H_distance,'hydrogene_turn',count)]
-to_rank=[('Score',10,False),('Confidence',10,False),('NextAA',10,True),('alpha',10,False),('beta',10,False),('iso_B',10,False),('alpha3',10,False),('alphaI',10,False)]
-                
-output_file_path = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/PKA/results/output_file.txt"  # Replace with the desired output file path
 
-#print_outside_file(output_file_path,input_file,to_rank,secondary_structures)
+
