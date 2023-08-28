@@ -255,7 +255,13 @@ def process_gene_site(site_list_file, cif_directory, output_file,database_folder
                                 'stability_scores': stability_scores,
                                 'phosphorylation_info': phosphorylation_info
                             })
-                         
+                        elif check_phosphorylation_context(protein_sequence, site[0]-1, site[1]):
+                            stability_scores = calculate_stability_cif(cif_file_path, site[0],secondary_structures)
+                            results.append({
+                                'gene_name': key_residue,
+                                'stability_scores': stability_scores,
+                                'phosphorylation_info': phosphorylation_info
+                            })
                             
     sorted_results = sorted(results, key=lambda x: x['gene_name'])
 

@@ -1,5 +1,5 @@
-from  import process_gene_site
-from no_id_given.graph_no_id_given import print_outside_file
+from uniprot_id_given import process_gene_site
+from graph_no_id_given import print_outside_file
 
 # This branch allows the analyse of the phosphorylation sites given one site_list where the id of the protein is not given.
 # Before any use, you should adapt the function create_gene_dict in order to process the information on your site_list correctly, and maybe the check_phosphorylation depending on what information do you have on your site_list

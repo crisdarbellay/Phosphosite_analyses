@@ -141,7 +141,7 @@ def calculate_slices_stats(data, confidence_range):
                 total_score += float(site_data.get('Score', 0))
                 total_nextAA += float(site_data.get('NextAA', 0))
     
-    if total_sites == 0:
+    if phosphorylated_sites == 0:
         return {
             'Number of phosphorylated site': 0,
             'Frequency': '0.00%',
