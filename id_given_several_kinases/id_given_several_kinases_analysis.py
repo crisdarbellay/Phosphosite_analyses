@@ -60,32 +60,28 @@ def create_kinases_datas(file_path,secondary_structures,human_cif_directory,mous
 
     kinase_dictionary = create_kinase_dictionary(file_path)
 
+    i=0
 
-    average_AFConf = []
-    average_scores = []
-    kinase_names = []
-
-# Boucle à travers chaque kinase et ses données associées
     for kinase, gene_data in kinase_dictionary.items():
         results = []
-        if not len(gene_data)<10:
-            continue
-    # Créer un dossier pour chaque kinase
+        i=i+1
+        print(f"{kinase}   {i}")
+    # Create a folder for each kinase
     
         output_directory_=output_directory+f"/{gene_data['kinase_animal']}"
         output_file = os.path.join(output_directory_, f"{kinase}_results.txt")
 
 
-            # Définir les noms de fichiers pour les groupes
+            # Define name of files 
         if not os.path.exists(output_directory_):
             os.makedirs(output_directory+f"/{gene_data['kinase_animal']}")   
             output_file = os.path.join(output_directory_, f"{kinase}_results.txt")
         
-    # Séparer les groupes en fonction de in_vivo et in_vitro
+    # Separate group in_vivo and in_vitro
         for index, (gene, sites_data) in enumerate(gene_data.items()):
         
             if index ==0:    
-                continue  # Saute la première paire gene-site_data
+                continue  
             organism=sites_data[0]['sub_organism']
             if organism=='human':
                 cif_file = human_cif_directory + '/' + sites_data[0]['filename'] + '.gz'
@@ -114,7 +110,6 @@ def create_kinases_datas(file_path,secondary_structures,human_cif_directory,mous
                 sub_acc_id=result['sub_acc_id']
 
                 for stats in stability_scores:
-            # Formater les valeurs pour chaque colonne
                     formatted_values = [
                         gene_name,
                         stats['residue_number'],
@@ -134,7 +129,7 @@ def create_kinases_datas(file_path,secondary_structures,human_cif_directory,mous
                         "X" if stats['in_vitro'] else "-"
                 ]
 
-            # Écrire les valeurs formatées dans le fichier de sortie
+            # Write values in output file
                     formatted_line = "\t".join(map(str, formatted_values)) + "\n"
                     out_file.write(formatted_line)
 

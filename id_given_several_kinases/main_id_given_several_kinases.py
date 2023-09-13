@@ -1,25 +1,24 @@
 import os
 from graph_several_kinases import print_outside_file
-from id_given_several_kinases.id_given_several_kinases_analysis import create_kinases_datas
+from id_given_several_kinases_analysis import create_kinases_datas
 
 # This branch allows the analyse of the phosphorylation sites given one site_list, containing several kinases and several substrates, and where the id of the protein is given.
 # Before any use, you should adapt the function create_gene_dict in order to process the information on your site_list correctly, and maybe the check_phosphorylation depending on what information do you have on your site_list
 # Replace these paths with the actual paths for your system
 
-input_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/human"
-output_root_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/human/results"
-# Chemin vers le dossier contenant les fichiers CIF
-human_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/human_database"
-mouse_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/mouse_database"
-rat_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/rat_database"
-# Chemin vers le dossier des résultats
-output_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results"
-file_path = "/mnt/c/Users/crisd/Downloads/Kinase_Substrate_Dataset/Kinase_Substrate_Dataset"
 
-alpha_H_distance = 8
-beta_E_distance = 8
+human_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/human_database"                #path to your human cif database folder (download on AlphaFold website)
+mouse_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/mouse_database"                #path to your mouse cif database folder         ""
+rat_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/rat_database"                    #path to your rat cif database folder           ""
+output_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results"                          #path to your results folder
+file_path = r"/mnt/c/Users/crisd/Downloads/Kinase_Substrate_Dataset/Kinase_Substrate_Dataset"    #path to your site_list
+input_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/human"                        #path to the input folder for which you want to generate datas (human,mouse,rat)
+output_root_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/human/results"          #path to the output folder for your stats
+
+sec_struct_distance = 8     #distance of detection for the secondary structures around your sites
+
 count = 0
-secondary_structures = [('H', alpha_H_distance, 'alpha', count), ('E', beta_E_distance, 'beta', count), ('B', beta_E_distance, 'iso_B', count), ('G', alpha_H_distance, 'alpha3', count), ('I', alpha_H_distance, 'alphaI', count), ('T', alpha_H_distance, 'hydrogene_turn', count)]
+secondary_structures = [('H', sec_struct_distance, 'alpha', count), ('E', sec_struct_distance, 'beta', count), ('B', sec_struct_distance, 'iso_B', count), ('G', sec_struct_distance, 'alpha3', count), ('I', sec_struct_distance, 'alphaI', count), ('T', sec_struct_distance, 'hydturn', count)]
 to_rank = [('Score', 15, False), ('AFConf', 15, False), ('NextAA', 15, True), ('alpha', 15, False), ('beta', 15, False),('hydturn',15,False)]
 
 create_kinases_datas(file_path,secondary_structures,human_cif_directory,mouse_cif_directory,rat_cif_directory,output_directory)
