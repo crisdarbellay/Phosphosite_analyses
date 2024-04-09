@@ -2,10 +2,25 @@ import pandas as pd
 import os
 import os
 from utility_id_given import calculate_stability_cif
-
+from collections import Counter
 
 def convert_code_to_filename(code):
     return f"AF-{code}-F1-model_v4.cif"
+
+def save_kinase_dictionary_to_txt(kinase_data, output_file):
+    with open(output_file, 'w') as txt_file:
+        for kinase, gene_data in kinase_data.items():
+            num_sites = sum(len(substrates) for gene, substrates in gene_data.items() if gene != 'kinase_animal')
+            if num_sites<20 or gene_data['kinase_animal']!='human':
+                continue
+            txt_file.write(f"Kinase: {kinase}\n")
+            txt_file.write(f"Number of phosphosites: {num_sites}\n\n")
+            for gene, substrates in gene_data.items():
+                if gene != 'kinase_animal':
+                    txt_file.write(f"\tTarget gene: {gene}\n\tNumber of phosphorylation: {len(substrates)}\n\tPhosphosites:\n")
+                    for substrate in substrates:
+                        txt_file.write(f"\t{substrate['sub_letter']}{substrate['sub_site']} ")
+                    txt_file.write(f"\n\n")
 
 def create_kinase_dictionary(file_path):
     kinase_data = {}
@@ -53,12 +68,29 @@ def create_kinase_dictionary(file_path):
             'filename':convert_code_to_filename(sub_acc_id),
             'sub_organism':sub_organisme
             })
+        
+# Créer une liste des clés à supprimer
+    keys_to_remove = []
+
+# Parcourir le dictionnaire pour identifier les clés à supprimer
+    for kinase, data in kinase_data.items():
+        for substrate_gene, substrates in data.items():
+            if len(substrates) == 1:
+                keys_to_remove.append((kinase, substrate_gene))  # Ajouter la clé à la liste des clés à supprimer
+
+# Supprimer les clés du dictionnaire
+    for kinase, substrate_gene in keys_to_remove:
+        del kinase_data[kinase][substrate_gene]
+
 
     return kinase_data
 
 def create_kinases_datas(file_path,secondary_structures,human_cif_directory,mouse_cif_directory,rat_cif_directory,output_directory):
 
     kinase_dictionary = create_kinase_dictionary(file_path)
+    print(kinase_dictionary)
+    file = output_directory + "/output_all_kinase.txt"
+    save_kinase_dictionary_to_txt(kinase_dictionary,file)
 
     i=0
 
@@ -132,6 +164,8 @@ def create_kinases_datas(file_path,secondary_structures,human_cif_directory,mous
             # Write values in output file
                     formatted_line = "\t".join(map(str, formatted_values)) + "\n"
                     out_file.write(formatted_line)
+
+
 
 
   

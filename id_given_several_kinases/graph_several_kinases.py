@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 def calculate_average(values):
     return sum(values) / len(values) if len(values) > 0 else 0
@@ -49,7 +50,9 @@ def calculate_ranking(data, column_name, top_n=15, ascending=False):
     for gene, site_dict in data.items():
         for site, values in site_dict.items():
             if column_name in values:
-                ranking_data.append((gene, site, values[column_name], values))
+                if values[column_name]!='None':
+
+                    ranking_data.append((gene, site, values[column_name], values))
 
     # Sort the ranking data based on the specified column
     
@@ -233,7 +236,7 @@ def create_heatmap(data, group_sites, group_name, characteristic, output_folder,
     
     plt.legend()  
     
-    plt.savefig(f'{output_folder}/{characteristic}_{kinase}{group_name}_heatmap.png')
+#    plt.savefig(f'{output_folder}/{characteristic}_{kinase}{group_name}_heatmap.png')
     plt.show()
 
 
@@ -242,6 +245,7 @@ def create_heatmap(data, group_sites, group_name, characteristic, output_folder,
 def print_outside_file(output_file_path,input_file,to_rank,secondary_structures,output_folder,kinase):
 
     data = parse_data(input_file)
+    print(data)
     groups = create_groups(data, input_file)
     datas=calculate_group_stats(groups, data)
     slices=calculate_all_slices_stats(data)
@@ -249,7 +253,6 @@ def print_outside_file(output_file_path,input_file,to_rank,secondary_structures,
     with open(input_file) as fichier:
         first_line = fichier.readline()
         txt_columns = [col.strip() for col in first_line.split('\t') if col.endswith('.txt') or col.endswith('.txt\n')]
-
     with open(output_file_path, 'w') as output_file:
 
         for group_name, group_sites in groups.items():
@@ -265,12 +268,12 @@ def print_outside_file(output_file_path,input_file,to_rank,secondary_structures,
         for rank in to_rank:
             ranking = calculate_ranking(data, rank[0], rank[1], rank[2])
             output_file.write(f"Ranking {rank[0]}:\n")
-            output_file.write("\tGene\tsite\tScore\tAFConf\tNextAA\tin_vivo\tin_vitro\t")
+            output_file.write("\tGene\tsite\tScore\tAFConf\tNextAA\tin_vivo\tin_vitro\tid_alphafold\t")
             for secondary_structure in secondary_structures:
                 output_file.write(f"{secondary_structure[2]}\t")
             output_file.write("\n")
             for index, row in ranking.iterrows():
-                output_file.write(f"{index + 1}.\t{row['Gene']}\t{row['Site']}\t{row['Values']['Score']}\t{row['Values']['AFConf']}\t{row['Values']['NextAA']}\t{row['Values']['in_vivo']}\t{row['Values']['in_vitro']}\t")
+                output_file.write(f"{index + 1}.\t{row['Gene']}\t{row['Site']}\t{row['Values']['Score']}\t{row['Values']['AFConf']}\t{row['Values']['NextAA']}\t{row['Values']['in_vivo']}\t{row['Values']['in_vitro']}\t{row['Values']['sub_id']}")
                 for secondary_structure in secondary_structures:
                     output_file.write(f"{row['Values'].get(secondary_structure[2], '')}\t")
                 output_file.write("\n")
@@ -281,3 +284,35 @@ def print_outside_file(output_file_path,input_file,to_rank,secondary_structures,
             for key, value in slice_data.items():
                 output_file.write(f"{key}: {value}\n")
             output_file.write("\n")
+            """
+
+human_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/human_database"                #path to your human cif database folder (download on AlphaFold website)
+mouse_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/mouse_database"                #path to your mouse cif database folder         ""
+rat_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/rat_database"                    #path to your rat cif database folder           ""
+output_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results"                          #path to your results folder
+   #path to your site_list
+input_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/paper/human"                        #path to the input folder for which you want to generate datas (human,mouse,rat)
+output_root_folder = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/human/stats/30_targets"          #path to the output folder for your stats
+
+sec_struct_distance = 8     #distance of detection for the secondary structures around your sites
+
+count = 0
+secondary_structures = [('H', sec_struct_distance, 'alpha', count), ('E', sec_struct_distance, 'beta', count), ('B', sec_struct_distance, 'iso_B', count), ('G', sec_struct_distance, 'alpha3', count), ('I', sec_struct_distance, 'alphaI', count), ('T', sec_struct_distance, 'hydturn', count)]
+to_rank = [('Score', 15, False), ('AFConf', 15, False), ('NextAA', 15, True), ('alpha', 15, False), ('beta', 15, False),('hydturn',15,False)]
+    
+# Iterate through files in the input folder
+for file_name in os.listdir(input_folder):
+    if file_name.endswith(".txt"):
+
+        input_file_path = os.path.join(input_folder, file_name)
+        output_subfile_name = file_name.replace("_results.txt", "_datas.txt")
+        output_subfile_path = os.path.join(output_root_folder,output_subfile_name)
+        with open(input_file_path) as fichier:
+            lines = fichier.readlines()
+            if len(lines)<30:
+                continue
+
+
+        print_outside_file( output_subfile_path,input_file_path, to_rank, secondary_structures,output_root_folder,kinase="")
+
+"""
