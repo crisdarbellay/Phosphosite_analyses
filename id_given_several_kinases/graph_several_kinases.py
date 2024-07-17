@@ -268,12 +268,12 @@ def print_outside_file(output_file_path,input_file,to_rank,secondary_structures,
         for rank in to_rank:
             ranking = calculate_ranking(data, rank[0], rank[1], rank[2])
             output_file.write(f"Ranking {rank[0]}:\n")
-            output_file.write("\tGene\tsite\tScore\tAFConf\tNextAA\tin_vivo\tin_vitro\tid_alphafold\t")
+            output_file.write("\tGene\tsite\tScore\tAFConf\tNextAA\tin_vivo\tin_vitro\tid_alphafold\tsite_aa\t")
             for secondary_structure in secondary_structures:
                 output_file.write(f"{secondary_structure[2]}\t")
             output_file.write("\n")
             for index, row in ranking.iterrows():
-                output_file.write(f"{index + 1}.\t{row['Gene']}\t{row['Site']}\t{row['Values']['Score']}\t{row['Values']['AFConf']}\t{row['Values']['NextAA']}\t{row['Values']['in_vivo']}\t{row['Values']['in_vitro']}\t{row['Values']['sub_id']}")
+                output_file.write(f"{index + 1}.\t{row['Gene']}\t{row['Site']}\t{row['Values']['Score']}\t{row['Values']['AFConf']}\t{row['Values']['NextAA']}\t{row['Values']['in_vivo']}\t{row['Values']['in_vitro']}\t{row['Values']['sub_id']}\t{row['Values']['site_aa']}\t")
                 for secondary_structure in secondary_structures:
                     output_file.write(f"{row['Values'].get(secondary_structure[2], '')}\t")
                 output_file.write("\n")

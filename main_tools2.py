@@ -15,16 +15,27 @@ def extract_residues_from_PDB(pdb_file):
     amino_acids = []
 
     # Read the PDB file and extract the amino acid positions
-    with open(pdb_file, 'r') as file:
+    with open(pdb_file, 'r') as file:                
         for line in file:
             if line.startswith('ATOM'):
-                amino_acid = line[17:20].strip()
-                strand_letter = line[21]
+                parts = line.split('\t')
+                if len(parts) > 1:
+                    amino_acid = parts[3]
+                    position = int(parts[5])
+                    strand_letter = parts[4]
+                else:    
+                    amino_acid = line[17:20].strip()
+                    strand_letter = line[21]
                 if amino_acid in three_to_one:
                     amino_acid = three_to_one[amino_acid]
-                    position = int(line[22:26])
-                    confidence = int(float(line[60:66]))
+                    if len(parts) > 1:
+                        position = int(parts[5])
+                        confidence = float(parts[10])
+                    else:
+                        position = int(line[22:26])
+                        confidence = float(line[60:66])
                     amino_acids.append((amino_acid, strand_letter, position, confidence))
+
 
     # Remove consecutive duplicate entries from the amino acids list
     residue_table = [] # filtered amino_acids
@@ -129,10 +140,17 @@ def parse_pdb_file(file_path):
     with open(file_path, 'r') as pdb_file:
         for line in pdb_file:
             if line.startswith('ATOM'):
-                x = float(line[30:38])
-                y = float(line[38:46])
-                z = float(line[46:54])
-                residue_id = int(line[22:26]) # only number, no chain ID
+                parts = line.split("\t")
+                if len(parts)>1:
+                    x = float(parts[6])
+                    y = float(parts[7])
+                    z = float(parts[8])
+                    residue_id = int(parts[5])
+                else:
+                    x = float(line[30:38])
+                    y = float(line[38:46])
+                    z = float(line[46:54])
+                    residue_id = int(line[22:26]) # only number, no chain ID
                 atom_coords.append([x, y, z])
                 residue_ids.append(residue_id)
     return np.array(atom_coords), residue_ids
@@ -163,8 +181,13 @@ def sort_atoms_by_type(pdb_file):
     current_residue = None
     for line in lines:
         if line.startswith('ATOM'):
-            residue_pos = int(line[22:26].strip())
-            atom_type = line[12:16].strip()
+            parts = line.split('\t')
+            if len(parts)>1:
+                residue_pos = int(parts[5])
+                atom_type = parts[2]
+            else:
+                residue_pos = int(line[22:26].strip())
+                atom_type = line[12:16].strip()
 
             # Skip hydrogen atoms
             if atom_type.startswith('H'):
@@ -259,18 +282,35 @@ def align_and_find_matching_subsequences(sequence1, sequence2):
             end_index = start_index + len(subsequence)
             counting = True
         else:
-            if counting and (j-1-i-1)>10:
+            if counting and (j-1-i-1)>10 and end_index<=len(sequence2)+2 and j<=len(sequence1)+2:
                 counting=False
                 matching_subsequences1.append((i + 1, j-1))
                 matching_subsequences2.append((start_index+1,end_index))
             i=j
     
     # Formater les sous-séquences correspondantes
+  
     formatted_subsequences1 = "/".join([f"A{start}-{end}" for start, end in matching_subsequences1])
     formatted_subsequences2 = "/".join([f"A{start}-{end}" for start, end in matching_subsequences2])
 
     
     return formatted_subsequences1,formatted_subsequences2
+
+def define_start(contigs, pdb):
+    i=1
+    residue_num=0
+    with open(pdb, 'r') as f:
+        for contig in contigs.split('/'):
+            start, end = contig.split('-')
+            start = int(start[1:])
+            end = int(end)
+            for line in f:
+                if line.startswith('ATOM') and residue_num!=int(line[22:26]):
+                    chain_id = line[21]
+                    residue_num = int(line[22:26])
+                    i+=1
+                    if i==start:
+                        return residue_num
 
 
 def define_contigs(pdb1, pdb2):
@@ -279,27 +319,33 @@ def define_contigs(pdb1, pdb2):
     contigs2,contigs2_temp = align_and_find_matching_subsequences(sequence1,sequence2)
     contigs1,contigs1_temp = align_and_find_matching_subsequences(sequence2,sequence1)
 
+
     if contigs1!=contigs2:  #if our contigs1 are weird, we keep contigs2 for both pdbs
         return contigs2,contigs2
     return contigs1,contigs2
 
 
 def CompareTwoPDBs(contigs,ref_pdb_file, mov_pdb_file):
+    """
     contigs1,contigs2=define_contigs(ref_pdb_file,mov_pdb_file)
     print(type(contigs))
     print("contigs:", contigs1,contigs2)
     print("original_pdb_file:", ref_pdb_file)
     print("temp_phospho_pdb:", mov_pdb_file)
+    """
     res_table1 = extract_residues_from_PDB(ref_pdb_file)
-    contigs_as_list_of_strings1 = extract_contig_from_residue_table(res_table1,contigs1)[2]
+    contigs_as_list_of_strings1 = extract_contig_from_residue_table(res_table1,contigs)[2]
     all_matching_positions_resIDs1 = index_contigs_in_generated_sequence(res_table1, contigs_as_list_of_strings1)[2]
 
-    contigs_as_list_of_strings2 = extract_contig_from_residue_table(res_table1,contigs2)[2]
+    contigs_as_list_of_strings2 = extract_contig_from_residue_table(res_table1,contigs)[2]
     res_table2 = extract_residues_from_PDB(mov_pdb_file)
     all_matching_positions_resIDs2 = index_contigs_in_generated_sequence(res_table2, contigs_as_list_of_strings2)[2]
-
+    
+    if len(all_matching_positions_resIDs1)<=len(all_matching_positions_resIDs2):
+        rotated_coords, rmsd = rigid_alignment(ref_pdb_file, mov_pdb_file, all_matching_positions_resIDs1, all_matching_positions_resIDs1)
+    else:      
     # Perform rigid alignment and compute RMSD
-    rotated_coords, rmsd = rigid_alignment(ref_pdb_file, mov_pdb_file, all_matching_positions_resIDs1, all_matching_positions_resIDs2)
+        rotated_coords, rmsd = rigid_alignment(ref_pdb_file, mov_pdb_file, all_matching_positions_resIDs2, all_matching_positions_resIDs2)
 
     ## Update the coordinates in the mobile PDB file
     update_pdb_coordinates(mov_pdb_file.split('.pdb')[0] + '_sorted.pdb', mov_pdb_file.split('.pdb')[0] + '_sorted-aligned.pdb', rotated_coords)

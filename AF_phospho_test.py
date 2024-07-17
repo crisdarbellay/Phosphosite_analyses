@@ -1,6 +1,7 @@
 import os
 from main_tools2 import extract_residues_from_PDB
 from main_tools2 import CompareTwoPDBs
+from main_tools2 import define_contigs
 import subprocess
 
 def fatcat(cheminpdb1, cheminpdb2):
@@ -28,6 +29,7 @@ def fatcat(cheminpdb1, cheminpdb2):
 
 # Dictionnaire de protéines et de leurs sites
 protein_sites = {
+
         "glycogene_phosphorylase": "14",
         "BUB1":"969",
         "CDK2":"160",
@@ -36,6 +38,8 @@ protein_sites = {
         "RET":"905",
         "PKA":"197",
         "PKA":"338"
+
+
 }
 
 with open(r"/mnt/c/Users/crisd/Desktop/rmsd_comparisons.txt", "w") as f:
@@ -56,73 +60,73 @@ with open(r"/mnt/c/Users/crisd/Desktop/rmsd_comparisons.txt", "w") as f:
             af_unphospho_file = f"{protein}-AF.pdb"
             af_d_phospho_file = f"{protein}-D{site}.pdb"
             af_e_phospho_file = f"{protein}-E{site}.pdb"
-            sequence = extract_residues_from_PDB(real_unphospho_file)
-            d = len(sequence)
-            print(d)
-            site = int(site)
-            b = site - 1
-            c = site + 1
-            contigs = "A1-" + str(d)
+        
+        contigs,contigs=define_contigs(af_d_phospho_file,real_phospho_file)
+        false_contigs,false_contigs=define_contigs(af_unphospho_file,real_phospho_file)
+        if protein=="RET":
+              contigs="A713-904/906-1010"
+              false_contigs=contigs
         
         f.write(f"Protein {protein}, phosphosite {site}:\n")
 
         # AF unphosphorylated versus AF phosphomimetic structure D
         try:
                 rmsd = CompareTwoPDBs(contigs, af_unphospho_file, af_d_phospho_file)
-                f.write(f"\t AF unphosphorylated structure versus AF phosphomimetic structure D: {round(rmsd,2)}\n")
+                f.write(f"\t AF unphosphorylated structure VS AF phosphomimetic structure D: {round(rmsd,2)}\n")
         except:
              pass
 
         # AF unphosphorylated versus AF phosphomimetic structure E
         try:
                 rmsd = CompareTwoPDBs(contigs, af_unphospho_file, af_e_phospho_file)
-                f.write(f"\t AF unphosphorylated structure versus AF phosphomimetic structure E: {round(rmsd,2)}\n")
+                f.write(f"\t AF unphosphorylated structure VS AF phosphomimetic structure E: {round(rmsd,2)}\n")
         except:
              pass
 
         # Real unphosphorylated versus AF unphosphorylated
         try:
                 rmsd = CompareTwoPDBs(contigs, af_unphospho_file, real_unphospho_file)
-                f.write(f"\t real unphosphorylated structure versus AF unphosphorylated structure: {round(rmsd,2)}\n")
+                f.write(f"\t real unphosphorylated structure VS AF unphosphorylated structure: {round(rmsd,2)}\n")
         except:
              pass
 
         # Real unphosphorylated versus AF phosphomimetic structure D
         try:
                 rmsd = CompareTwoPDBs(contigs,af_d_phospho_file, real_unphospho_file)
-                f.write(f"\t real unphosphorylated structure versus AF phosphomimetic structure D: {round(rmsd,2)}\n")
+                f.write(f"\t real unphosphorylated structure VS AF phosphomimetic structure D: {round(rmsd,2)}\n")
         except:
              pass
 
         # Real unphosphorylated versus AF phosphomimetic structure E
         try:
                 rmsd = CompareTwoPDBs(contigs,af_e_phospho_file, real_unphospho_file)
-                f.write(f"\t real unphosphorylated structure versus AF phosphomimetic structure E: {round(rmsd,2)}\n")
+                f.write(f"\t real unphosphorylated structure VS AF phosphomimetic structure E: {round(rmsd,2)}\n")
         except:
               pass
 
         # Real phosphorylated versus AF unphosphorylated
         try:
                 rmsd = CompareTwoPDBs(contigs,af_unphospho_file, real_phospho_file)
-                f.write(f"\t real phosphorylated structure versus AF unphosphorylated structure: {round(rmsd,2)}\n")
+                f.write(f"\t real phosphorylated structure VS AF unphosphorylated structure: {round(rmsd,2)}\n")
         except:
               pass
 
         # Real phosphorylated versus AF phosphomimetic structure D
         try:
                 rmsd = CompareTwoPDBs(contigs,af_d_phospho_file, real_phospho_file)
-                f.write(f"\t real phosphorylated structure versus AF phosphomimetic structure D: {round(rmsd,2)}\n")
+                f.write(f"\t real phosphorylated structure VS AF phosphomimetic structure D: {round(rmsd,2)}\n")
         except:
               pass
         # Real phosphorylated versus AF phosphomimetic structure E
         try:
                 rmsd = CompareTwoPDBs(contigs, af_e_phospho_file, real_phospho_file)
-                f.write(f"\t real phosphorylated structure versus AF phosphomimetic structure E: {round(rmsd,2)}\n")
+                f.write(f"\t real phosphorylated structure VS AF phosphomimetic structure E: {round(rmsd,2)}\n")
         except:
               pass
         # Real unphosphorylated versus real phosphorylated
         try:
                 rmsd = CompareTwoPDBs(contigs, real_unphospho_file, real_phospho_file)
-                f.write(f"\t real unphosphorylated structure versus real phosphorylated structure: {round(rmsd,2)}\n")
+                f.write(f"\t real unphosphorylated structure VS real phosphorylated structure: {round(rmsd,2)}\n")
         except:
               pass
+        f.write("\n")

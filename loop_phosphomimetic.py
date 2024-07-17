@@ -79,7 +79,7 @@ def extract_sequence_from_pdb(pdb_file):
 
     return sequence
 # Function to perform a phosphomimetic
-def phosphomimetic(pdb_file, site):
+def phosphomimetic(cif_file, site):
     """
     Perform phosphomimetic simulation on the given PDB file at the specified site.
 
@@ -90,12 +90,11 @@ def phosphomimetic(pdb_file, site):
     Returns:
     - str: Path to the phosphomimetic PDB file.
     """
-    sequence = list(extract_sequence_from_pdb(pdb_file))  # Convert sequence to a list of characters
+    sequence = list(extract_sequence_from_cif(cif_file))  # Convert sequence to a list of characters
     site=int(site)
-    sequence[site] = 'D'  # Modify the site of phosphorylation
+    sequence[site-1] = 'D'  # Modify the site of phosphorylation
     modified_sequence = ''.join(sequence)  # Convert the list back to a string
-    result_pdb = collabfold(modified_sequence)
-    return result_pdb,len(sequence)
+    return sequence
 
 
 def extract_gene_site_pairs(file_path):

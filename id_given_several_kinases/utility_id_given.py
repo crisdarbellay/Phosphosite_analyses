@@ -58,7 +58,7 @@ def extract_confidence_score(line):
     """
     Extract the confidence score from a line in the PDB file.
     """
-    confidence_score = float(line.split()[14])
+    confidence_score = float(line.split()[10])
     return confidence_score
 
 def search_phosphorylation_info(gene_dict, database_folder):
@@ -82,7 +82,7 @@ def calculate_confidence_scores(atom_line, residue_key):
     """
     confidence_scores = {}
     for line in atom_line:           
-        line_residue_number = int(line.split()[-2])            
+        line_residue_number = int(line.split()[1])            
         if line_residue_number == residue_key[1]:
             confidence_score = extract_confidence_score(line)
             confidence_scores[residue_key] = confidence_score
