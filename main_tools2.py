@@ -325,32 +325,33 @@ def define_contigs(pdb1, pdb2):
     return contigs1,contigs2
 
 
-def CompareTwoPDBs(contigs,ref_pdb_file, mov_pdb_file):
-    """
-    contigs1,contigs2=define_contigs(ref_pdb_file,mov_pdb_file)
-    print(type(contigs))
-    print("contigs:", contigs1,contigs2)
-    print("original_pdb_file:", ref_pdb_file)
-    print("temp_phospho_pdb:", mov_pdb_file)
-    """
+def CompareTwoPDBs(contigs, ref_pdb_file, mov_pdb_file):
+    # Extract residue information from the reference PDB
     res_table1 = extract_residues_from_PDB(ref_pdb_file)
-    contigs_as_list_of_strings1 = extract_contig_from_residue_table(res_table1,contigs)[2]
+    contigs_as_list_of_strings1 = extract_contig_from_residue_table(res_table1, contigs)[2]
     all_matching_positions_resIDs1 = index_contigs_in_generated_sequence(res_table1, contigs_as_list_of_strings1)[2]
 
-    contigs_as_list_of_strings2 = extract_contig_from_residue_table(res_table1,contigs)[2]
+    # Extract residue information from the moving PDB
     res_table2 = extract_residues_from_PDB(mov_pdb_file)
+    contigs_as_list_of_strings2 = extract_contig_from_residue_table(res_table2, contigs)[2]
     all_matching_positions_resIDs2 = index_contigs_in_generated_sequence(res_table2, contigs_as_list_of_strings2)[2]
-    
-    if len(all_matching_positions_resIDs1)<=len(all_matching_positions_resIDs2):
-        rotated_coords, rmsd = rigid_alignment(ref_pdb_file, mov_pdb_file, all_matching_positions_resIDs1, all_matching_positions_resIDs1)
-    else:      
-    # Perform rigid alignment and compute RMSD
-        rotated_coords, rmsd = rigid_alignment(ref_pdb_file, mov_pdb_file, all_matching_positions_resIDs2, all_matching_positions_resIDs2)
 
-    ## Update the coordinates in the mobile PDB file
-    update_pdb_coordinates(mov_pdb_file.split('.pdb')[0] + '_sorted.pdb', mov_pdb_file.split('.pdb')[0] + '_sorted-aligned.pdb', rotated_coords)
+    # Determine which set of residue IDs to use for alignment
+    if len(all_matching_positions_resIDs1) <= len(all_matching_positions_resIDs2):
+        selected_residues = all_matching_positions_resIDs1
+    else:
+        selected_residues = all_matching_positions_resIDs1
+
+    # Perform rigid alignment and compute RMSD
+    rotated_coords, rmsd = rigid_alignment(ref_pdb_file, mov_pdb_file, selected_residues, selected_residues)
+
+    # Update the coordinates in the moving PDB file
+    sorted_pdb_file = mov_pdb_file.split('.pdb')[0] + '_sorted.pdb'
+    aligned_pdb_file = mov_pdb_file.split('.pdb')[0] + '_sorted-aligned.pdb'
+    update_pdb_coordinates(sorted_pdb_file, aligned_pdb_file, rotated_coords)
 
     return rmsd
+
 
 
 def parse_pdb_backbone_binders(pdb_file, chain_id='A'):

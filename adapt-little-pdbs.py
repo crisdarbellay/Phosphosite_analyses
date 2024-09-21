@@ -3,7 +3,7 @@ import re
 
 def process_pdb_file(pdb_file, site, output_folder):
     output_path = os.path.join(output_folder, f'{os.path.basename(pdb_file).split(".")[0]}.pdb')
-    decalage = max(0, site - 50)
+    decalage = max(0, site - 30)
     if decalage > 0:
         with open(pdb_file, 'r') as infile, open(output_path, 'w') as outfile:
             for line in infile:
@@ -30,8 +30,8 @@ def split_string(s):
         return protein, site
 
 
-output_folder = f"/mnt/c/Users/crisd/Desktop/ProteinDesign/mass_test_1/pdb-ball-50-contigs-adapted/"
-base_folder = f"/mnt/c/Users/crisd/Desktop/ProteinDesign/mass_test_1/pdb-ball-50"
+output_folder = f"/mnt/c/Users/crisd/Desktop/little-adapted/"
+base_folder = f"/mnt/c/Users/crisd/Desktop/little/"
 
 for root, dirs, files in os.walk(base_folder):
     for file in files:

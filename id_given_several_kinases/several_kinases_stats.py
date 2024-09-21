@@ -37,7 +37,7 @@ def create_scatter_graph(title, xlabel, ylabel, y_values, file_name, kinase_avg_
 
 
 # Path to the directory containing kinase files
-folder_path = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/results/human_10_gene_min"
+folder_path = r"/mnt/c/Users/crisd/Desktop/PhosphoSwitch/datas/1_algorithm/all_kinases_results/human"                          #path to your results folder
 
 # Initialize dictionaries to store kinase data
 kinase_avg_alpha = {}

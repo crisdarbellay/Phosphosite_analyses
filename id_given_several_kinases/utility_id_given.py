@@ -58,7 +58,7 @@ def extract_confidence_score(line):
     """
     Extract the confidence score from a line in the PDB file.
     """
-    confidence_score = float(line.split()[10])
+    confidence_score = float(line.split()[14])
     return confidence_score
 
 def search_phosphorylation_info(gene_dict, database_folder):
@@ -76,18 +76,17 @@ def search_phosphorylation_info(gene_dict, database_folder):
                                 break
     return gene_dict
 
-def calculate_confidence_scores(atom_line, residue_key):
+def calculate_confidence_scores(atom_lines, residue_key):
     """
-    Calculate the confidence scores for a specific residue.
+    Calculate the confidence score for a specific residue.
     """
-    confidence_scores = {}
-    for line in atom_line:           
-        line_residue_number = int(line.split()[1])            
+    for line in atom_lines:           
+        line_residue_number = int(line.split()[8])          
         if line_residue_number == residue_key[1]:
             confidence_score = extract_confidence_score(line)
-            confidence_scores[residue_key] = confidence_score
-            break
-    return confidence_scores
+            return float(confidence_score)
+    return None  # Retourne None si aucun score de confiance n'est trouvé
+
 
 def calculate_stability_cif(cif_file_path, sites_data,secondary_structures):
     """
@@ -133,6 +132,7 @@ def calculate_stability_cif(cif_file_path, sites_data,secondary_structures):
                 dssp_info[residue_number] = res_dssp              
     for site_data in sites_data:
         helix_count = 0
+        amino_acids_close = 0
         beta_count = 0
         stability_score = 0
         chain_distance = 100000
@@ -149,7 +149,6 @@ def calculate_stability_cif(cif_file_path, sites_data,secondary_structures):
                 for residu2 in model.get_residues():
                     distance = calculate_distance(residu1['CA'].get_coord(), residu2['CA'].get_coord())
                     res_dssp = dssp_info.get(residu2.get_id()[1], '')
-
                     for count in secondary_structures:
                         if count[0]==res_dssp:
                             chain_distance_temp = abs(residu1.get_id()[1] - residu2.get_id()[1])
@@ -157,21 +156,26 @@ def calculate_stability_cif(cif_file_path, sites_data,secondary_structures):
                                 chain_distance = chain_distance_temp
                         if distance<=count[1] and res_dssp==count[0]:                        
                             count_dict[count[2]] += 1
-                    if distance <= 10.0:
+                    if distance <= 6.0:
+                        amino_acids_close += 1
                         try:
-                            confidence_score = calculate_confidence_scores(begin_by_ATOM(temp_cif_file_path), residu2.get_id())[residu2.get_id()]
-                        except: 
+                            confidence_score = calculate_confidence_scores(begin_by_ATOM(temp_cif_file_path), residu2.get_id())
+                        except Exception as e: 
+                            print(f"Error: {e}")
                             confidence_score = None
+
                         if confidence_score is not None:
                             confidence_scores_sum += confidence_score
-                            confidence_scores_count += 1                           
+                            confidence_scores_count += 1                        
         stability_score = sum(count_dict.values())
+        percentage = (stability_score/amino_acids_close)*100
         average_confidence_score = round(confidence_scores_sum / confidence_scores_count, 1) if confidence_scores_count > 0 else None
         temp_dict = {count[2]: count[3] for count in secondary_structures}
 
         stability_scores.append({
             'residue_number': site_data['sub_site'],
             'stability_score': stability_score,
+            'percent' : round(percentage,0),
             'average_confidence_score': average_confidence_score,
             'chain_dist_secondary_struct': chain_distance,
             'sub_organism':site_data['sub_organism'],

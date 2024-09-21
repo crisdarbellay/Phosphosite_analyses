@@ -139,7 +139,7 @@ def calculate_stability_cif(cif_file_path, site,secondary_structures):
     residues = model.get_residues()
 
     for residu1 in residues:
-        if residu1.get_id()[1] == site:
+        if 0 == 0:
             for residu2 in model.get_residues():
                 distance = calculate_distance(residu1['CA'].get_coord(), residu2['CA'].get_coord())
                 res_dssp = dssp_info.get(residu2.get_id()[1], '')

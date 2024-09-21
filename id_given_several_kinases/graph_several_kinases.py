@@ -40,7 +40,7 @@ def parse_data(input_file):
         return table
 
 
-def calculate_ranking(data, column_name, top_n=15, ascending=False):
+def calculate_ranking(data, column_name, top_n=20, ascending=False):
     """
     Calculate ranking based on a specified column in the data dictionary.
     """
