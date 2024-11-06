@@ -8,8 +8,10 @@ from main_tools2 import CompareTwoPDBs
 from main_tools import extract_residues_from_PDB
 from id_given_several_kinases import utility_id_given as util
 from no_id_given import utility_no_id_given as no
-
+from testbourré import calculate_stability_pdb
 import math
+
+
 sec_struct_distance = 6     #distance of detection for the secondary structures around your sites
 count = 0
 secondary_structures = [('H', sec_struct_distance, 'alpha', count), ('E', sec_struct_distance, 'beta', count), ('B', sec_struct_distance, 'iso_B', count), ('G', sec_struct_distance, 'alpha3', count), ('I', sec_struct_distance, 'alphaI', count), ('T', sec_struct_distance, 'hydturn', count)]
@@ -20,20 +22,20 @@ def sort_key_with_nan(value):
     return (1, value)
 
 def main():
-    input_file = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/selection_no_doublon.txt"
-    temp_file = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/temp_results.txt"
-    output_file = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/results_rmsd_score.txt"
-    output_total = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/results_total__score.txt"
-    output_file_sorted_d = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/results_rmsd_sorted_d_score.txt"
-    output_file_sorted_e = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/results_rmsd_sorted_e_score.txt"
-    output_txt = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/results_table.txt"
-    output_csv = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/phosphosites/results/results_table.csv"
+    input_file = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/selection_no_doublon.txt"
+    temp_file = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/temp_results.txt"
+    output_file = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/results_rmsd_score.txt"
+    output_total = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/results_total__score.txt"
+    output_file_sorted_d = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/results_rmsd_sorted_d_score.txt"
+    output_file_sorted_e = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/results_rmsd_sorted_e_score.txt"
+    output_txt = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/results_table.txt"
+    output_csv = "/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/phosphosites/results/results_table.csv"
 
     with open(input_file, 'r') as f_in, open(temp_file, 'w') as f_temp, open(output_total, 'w') as tot:
         lines = f_in.readlines()
         header = lines[0].strip().split('\t')
         header.extend([
-            "wt-D_full", "wt-E_full", "wt-D_30", "wt-E_30", "wt-D_5", "wt-E_5"
+            "wt-D_full", "wt-E_full", "wt-D_30", "wt-E_30", "wt-D_5", "wt-E_5","score_WT-D","score_WT-E","score_D-E"
         ])
 
         f_temp.write('\t'.join(header) + '\n')
@@ -41,22 +43,26 @@ def main():
 
         results = []
 
-        for line in lines[1:20]:
+        for line in lines[1:]:
             if line.startswith("Kinase"):
                 f_temp.write(line.split()[0])
                 continue
             gene_data = line.strip().split('\t')
+            if gene_data[0]!='Src' and gene_data[0]!= 'PKACA':
+                continue
             gene_name = gene_data[1]
             site = gene_data[2]
             score = gene_data[3]
 
             # Paths to PDB files for each type of data
-            wild_type_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final/pdb/{gene_name}"
-            phosphomimetic_d_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final/pdb/{gene_name}-D{site}"
-            phosphomimetic_e_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final/pdb/{gene_name}-E{site}"
+            wild_type_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/mass_colab_full/pdb/{gene_name}"
+            phosphomimetic_d_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/mass_colab_full/pdb/{gene_name}-D{site}"
+            phosphomimetic_e_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/mass_colab_full/pdb/{gene_name}-E{site}"
 
             if not os.path.exists(wild_type_folder):
-                continue
+                wild_type_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/8_angstrom/2_algorithm/mass_colab_full/pdb/{gene_name}-{site}"
+                if not os.path.exists(wild_type_folder):
+                    continue
             if not os.path.exists(phosphomimetic_d_folder):
                 continue
             if not os.path.exists(phosphomimetic_e_folder):
@@ -77,8 +83,8 @@ def main():
                 sequence = extract_residues_from_PDB(wild_type_pdb_full)
                 site = int(site)
                 d = int(len(sequence))
-                a = max(site - 5, 1)
-                b = min(site + 5, d)
+                a = max(site - 10, 1)
+                b = min(site + 10, d)
                 e = max(site - 30, 1)
                 f = min(site + 30, d)
                 contigs_full = f"A1-{site - 1}/A{site + 1}-{d}"
@@ -92,13 +98,21 @@ def main():
                 rmsd_e_30 = round(CompareTwoPDBs(contigs_30, wild_type_pdb_full, phosphomimetic_e_pdb_full), 3)
                 rmsd_d_5 = round(CompareTwoPDBs(contigs_5, wild_type_pdb_full, phosphomimetic_d_pdb_full), 3)
                 rmsd_e_5 = round(CompareTwoPDBs(contigs_5, wild_type_pdb_full, phosphomimetic_e_pdb_full), 3)
-                score_D = no.calculate_stability_cif(phosphomimetic_d_pdb_full, site,secondary_structures)
-                score_E = no.calculate_stability_cif(phosphomimetic_e_pdb_full, site,secondary_structures)
-                score_diff_D = score-score_D
-                score_diff_E = score-score_D
+                try:
+                    score_D = no.calculate_stability_cif(phosphomimetic_d_pdb_full, site,secondary_structures)
+                    score_E = no.calculate_stability_cif(phosphomimetic_e_pdb_full, site,secondary_structures)
+                except:
+                    score_D = calculate_stability_pdb(phosphomimetic_d_pdb_full, site,secondary_structures)
+                    score_D = int(score_D[0]['stability_score'])
+                    score_E = calculate_stability_pdb(phosphomimetic_e_pdb_full, site,secondary_structures)
+                    score_E = int(score_E[0]['stability_score'])
+
+                score_diff_D = int(score)-score_D
+                score_diff_E = int(score)-score_D
+                score_diff_D_E = score_D-score_E
 
                 gene_data.extend([
-                    rmsd_d_full_contigs, rmsd_e_full_contigs, rmsd_d_30, rmsd_e_30, rmsd_d_5, rmsd_e_5,score_diff_D,score_diff_E
+                    rmsd_d_full_contigs, rmsd_e_full_contigs, rmsd_d_30, rmsd_e_30, rmsd_d_5, rmsd_e_5,score_diff_D,score_diff_E,score_diff_D_E
                 ])
                 f_temp.write('\t'.join(map(str, gene_data)) + '\n')
                 results.append(gene_data)

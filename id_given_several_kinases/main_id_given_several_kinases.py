@@ -2,6 +2,7 @@ import os
 from graph_several_kinases import print_outside_file
 from id_given_several_kinases_analysis import create_kinases_datas
 
+
 # This branch allows the analyse of the phosphorylation sites given one site_list, containing several kinases and several substrates, and where the id of the protein is given.
 # Before any use, you should adapt the function create_gene_dict in order to process the information on your site_list correctly, and maybe the check_phosphorylation depending on what information do you have on your site_list
 # Replace these paths with the actual paths for your system
@@ -11,7 +12,7 @@ human_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/human_database"
 mouse_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/mouse_database"                #path to your mouse cif database folder         ""
 rat_cif_directory = r"/mnt/c/Users/crisd/Desktop/ProteinDesign/rat_database"                    #path to your rat cif database folder           ""
 output_directory =  r"/mnt/c/Users/crisd/Desktop/PhosphoSwitch/datas/6_angstrom/control2/1_algorithm/all_kinases_results"                          #path to your results folder
-file_path = r"/mnt/c/Users/crisd/Desktop/PhosphoSwitch/datas/6_angstrom/control2/1_algorithm/controls.txt"    #path to your site_list
+file_path = r"/mnt/c/Users/crisd/Desktop/PhosphoSwitch/datas/6_angstrom/control2/1_algorithm/Kinase_Substrate_Dataset"    #path to your site_list
 input_folder = r"/mnt/c/Users/crisd/Desktop/PhosphoSwitch/datas/6_angstrom/control2/1_algorithm/all_kinases_results"                       #path to the input folder for which you want to generate datas (human,mouse,rat)
 output_root_folder = r"/mnt/c/Users/crisd/Desktop/PhosphoSwitch/datas/6_angstrom/control2/1_algorithm/analysis"          #path to the output folder for your stats
 

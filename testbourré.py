@@ -33,7 +33,7 @@ def calculate_stability_pdb(pdb_file_path, site_data, secondary_structures):
     stability_score, chain_distance, average_confidence_score = calculate_scores(model, site_data, secondary_structures, dssp_info, pdb_file_path)
     
     stability_scores.append({
-        'residue_number': site_data[1],
+        'residue_number': site_data,
         'stability_score': stability_score,
         'average_confidence_score': average_confidence_score,
         'chain_dist_secondary_struct': chain_distance,
@@ -63,6 +63,11 @@ def parse_dssp(dssp_file_path):
     return dssp_info
 
 def calculate_scores(model, site_data, secondary_structures, dssp_info, pdb_file_path):
+    # Vérifie si site_data est une liste
+    if isinstance(site_data, list):
+        site_residue_number = int(site_data[0]["sub_site"])  # Utilise le premier élément
+    else:
+        site_residue_number = int(site_data)
     stability_score = 0
     chain_distance = 100000
     confidence_scores_sum = 0
@@ -70,7 +75,6 @@ def calculate_scores(model, site_data, secondary_structures, dssp_info, pdb_file
     count_dict = {count[2]: 0 for count in secondary_structures}
     
     residues = model.get_residues()
-    site_residue_number = int(site_data[1])
     
     for residu1 in residues:
         if residu1.get_id()[1] == site_residue_number:
@@ -79,14 +83,14 @@ def calculate_scores(model, site_data, secondary_structures, dssp_info, pdb_file
                 res_dssp = dssp_info.get(residu2.get_id()[1], '')
                 
                 for count in secondary_structures:
-                    if count[0] == res_dssp and distance <= count[1]:
+                    if count[0] == res_dssp and distance <= 6:
                         chain_distance_temp = abs(residu1.get_id()[1] - residu2.get_id()[1])
                         if chain_distance_temp < chain_distance:
                             chain_distance = chain_distance_temp
                         count_dict[count[2]] += 1
 
                 if distance <= 10.0:
-                    confidence_score = util.calculate_confidence_scores(util.begin_by_ATOM(pdb_file_path), residu2.get_id()).get(residu2.get_id(), None)
+                    confidence_score = util.calculate_confidence_scores(util.begin_by_ATOM(pdb_file_path), residu2.get_id())
                     if confidence_score is not None:
                         confidence_scores_sum += confidence_score
                         confidence_scores_count += 1
@@ -110,15 +114,18 @@ def main():
         lines = f_in.readlines()
         header = lines[0].strip().split('\t')
         header.extend([
-            "wt-D_full", "wt-E_full", "wt-D_30", "wt-E_30", "wt-D_5", "wt-E_5"
+        "wt-D_full", "wt-E_full", "wt-D_30", "wt-E_30", "wt-D_5", "wt-E_5",
+        "score_diff_D", "score_diff_E"  
         ])
-
         f_temp.write('\t'.join(header) + '\n')
         tot.write('\t'.join(header) + '\n')
 
         results = []
 
-        for line in lines[1:20]:
+        for line in lines[1:]:
+            kinase=line.split()[0]
+            if kinase != 'Src' and kinase != 'PKACA':
+                continue
             if line.startswith("Kinase"):
                 f_temp.write(line.split()[0])
                 continue
@@ -128,9 +135,9 @@ def main():
             score = gene_data[3]
 
             # Paths to PDB files for each type of data
-            wild_type_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final/pdb/{gene_name}"
-            phosphomimetic_d_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final/pdb/{gene_name}-D{site}"
-            phosphomimetic_e_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final/pdb/{gene_name}-E{site}"
+            wild_type_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final_2/pdb/{gene_name}"
+            phosphomimetic_d_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final_2/pdb/{gene_name}-D{site}"
+            phosphomimetic_e_folder = f"/mnt/c/Users/crisd/Desktop/Phosphoswitch/datas/6_angstrom/2_algorithm/mass_test_final_2/pdb/{gene_name}-E{site}"
 
             if not os.path.exists(wild_type_folder):
                 continue
@@ -158,7 +165,7 @@ def main():
                 b = min(site + 5, d)
                 e = max(site - 30, 1)
                 f = min(site + 30, d)
-                contigs_full = f"A1-{site - 1}/A{site + 1}-{d}"
+                contigs_full = f"A1-{site - 1}/A{site +         1}-{d}"
                 contigs_30 = f"A{e}-{site - 1}/A{site + 1}-{f}"
                 contigs_5 = f"A{a}-{site - 1}/A{site + 1}-{b}"
 
@@ -173,8 +180,8 @@ def main():
                 # New score calculations using calculate_stability_pdb function
                 score_D = calculate_stability_pdb(phosphomimetic_d_pdb_full, site, secondary_structures)
                 score_E = calculate_stability_pdb(phosphomimetic_e_pdb_full, site, secondary_structures)
-                score_diff_D = score - score_D[0]['stability_score']
-                score_diff_E = score - score_E[0]['stability_score']
+                score_diff_D = float(score) - float(score_D[0]['stability_score'])
+                score_diff_E = float(score) - float(score_E[0]['stability_score'])
 
                 gene_data.extend([
                     rmsd_d_full_contigs, rmsd_e_full_contigs, rmsd_d_30, rmsd_e_30, rmsd_d_5, rmsd_e_5, score_diff_D, score_diff_E
@@ -210,4 +217,3 @@ def write_sorted_results(file_path, header, results_sorted, use_pretty_table=Fal
             for result in results_sorted:
                 f_out_sorted.write('\t'.join(map(str, result)) + '\n')
 
-main()
